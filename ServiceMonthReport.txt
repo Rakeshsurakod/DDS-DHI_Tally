@@ -1,0 +1,101 @@
+;;;;; Jai Shree Raam ;;;;;;;;;;;;
+
+[#Report: Sales Register]
+	
+	 Fetch Object: VoucherType   : ##VoucherTypeName   : TBalDebits, TBalCredits, BSClosing, TBalClosing, TBalOpening
+	 
+[#Line: DBTitle1]
+		Add :Right Field: Before: DSP VchTypeTitle	: ServiceMonth
+		
+[#Line: DBTitle2]
+		Add :Right Field: Before: DSP VchTypeTitle	: FromandTo
+		
+[#Collection: Daybook Vouchers of Company]
+	Fetch	:	SalesSERVICEDATE, ServiceToDate
+	
+;select $vouchernumber, $SALESSERVICEDATE from DaybookVouchersofCompany
+
+[#Collection: Specific Vouchers of Company]
+	Fetch	:	SalesSERVICEDATE, ServiceToDate
+	
+;select $vouchernumber, $SalesSERVICEDATE from SpecificVouchersofCompany
+
+[Field:ServiceMonth]
+	Use         : Short Name Title Field
+	Width       : @@DSPNumberWidth + 4
+	Info        : $$LocaleString:"Service Month"
+	Invisible	: Not (##VoucherTypeName = $$VchTypeSales)
+	Style       : Normal Bold
+	Align		: Center	
+	
+[Field:FromandTo]
+	Use         : Short Name Title Field
+	Width       : @@DSPNumberWidth + 4
+	Info        : $$LocaleString:" From           To"
+	Invisible	: Not (##VoucherTypeName = $$VchTypeSales)
+
+[#Line:DSP WithStorageAmt]
+	Add : Right Fields  : At Beginning : ServiceMonthdate
+	
+	
+[Field:ServiceMonthdate]
+	Left Fields	: From date1, Todate1
+	Use			: Uni Date Field
+	Width       : @@DSPNumberWidth + 5
+	Invisible	: Not (##VoucherTypeName = $$VchTypeSales)
+	Align		: Center
+	
+[Field:Fromdate1]
+	width		: 6
+	Set as		: $SalesSERVICEDATE
+	
+[Field:Todate1]
+	width		: 7
+	Set as		: $ServiceToDate
+	
+;;;;;;Main Sales Register Collection ;;;;;;;;
+[#Collection: Filtered Vouchers of Company]
+	Fetch: SalesSERVICEDATE, ServiceToDate
+	
+[#Collection: SRC Filtered Vouchers of Company]
+	Fetch	: SalesServicedate, ServiceToDate
+
+;;;;;;;;; Ledger report Collections ;;;;;;;;;
+[#Collection: Vouchers of Ledger]
+	Fetch	: SalesServicedate, ServiceToDate
+	
+;;;;;;;;; Filter method ;;;;;;;;;;;
+
+[#Collection: SVFilterObjsColl]
+	
+		Add: Object: ServiceMonth, ServiceToDate
+	
+[Object: ServiceMonth]
+
+		FLTGroupLabel		: @@FLTServiceDetails					; This attribute helps to add the Group in Table
+		FltUserMethodName	: $$LocaleString:"Service From Date"    ; This attribute helps to set the name of column 
+		FltMethodName		: "SalesSERVICEDATE"                    ; Define the added UDF, which is added in voucher level
+		FltMethodType       : Voucher                               ; Define the context (voucher / Ledger etc.)
+		FltDataType         : String                                ; UDF data type 
+
+[Object: ServiceToDate]
+
+		FLTGroupLabel		: @@FLTServiceDetails					
+		FltUserMethodName	: $$LocaleString:"Service To Date"    	
+		FltMethodName		: "ServiceToDate"                    	
+		FltMethodType       : Voucher                               
+		FltDataType         : String                                
+
+[#Collection: FLT Method Labels]
+
+	Object	: FLT Label Service Details
+
+[System:Formulae]
+	FLTServiceDetails				: $$LocaleString:"Service Details"
+	
+[Object: FLT Label Service Details]
+
+	Use					: Label Object
+	Name				: @@FLTServiceDetails
+	ZeroMethodCount		: $$IsEmptyCollection:FLTObjMethodsofLabel
+	

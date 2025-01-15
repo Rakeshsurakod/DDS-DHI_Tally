@@ -1,0 +1,628 @@
+[Include:Customer.txt]
+[Include:Product.txt]
+[Include:DHIsales.txt]
+[Include:DHIReceipt.txt]
+[Include:DHICreditNote.txt]
+[Include:DHIJournal.txt]
+[Include:ServiceMonthReport.txt]
+[Include:Cancel Sales.txt]
+
+[#Menu: Gateway of Tally]
+	Add:Key Item : Before: @@locQuit : DHI Integration : I :Menu:DHIDailySync
+	Add:Key Item : BLANK
+	
+[Menu:DHIDailySync]
+	
+	Title	:	"DHI Integration"
+	Key Item		: "DHI Configuration" 		: D : Alter     	: Configration
+	Item        	:BLANK 
+	Key Item    	: "Customer Sync"      		: C : Call    		: Dyms_CustomeDownload:$$SyncTallyKPLManual="Yes"
+	Item			:BLANK
+	Key Item    	: "Service Item Sync"    	: I : Call    		: Dyms_ProductDownload:$$SyncTallyKPLManual="Yes"
+	Item			:BLANK
+	Key Item    	: "Sales Sync"   			: S : Call    		: Dyms_SalesDownload:$$SyncTallyKPLManual="Yes"
+	Item			:BLANK
+	Key Item    	: "Receipt Sync"      		: R : Call    		: Dyms_ReceiptDownload:"No";$$SyncTallyKPLManual="Yes"
+	Item			:BLANK
+	Key Item    	: "Credit Note"      		: C : Call    		: Dyms_CreditNoteDownload:$$SyncTallyKPLManual="Yes"
+	Item			:BLANK	
+	Key Item    	: "Journal Voucher"  		: J : Call    		: Dyms_JournalDownload:"No";$$SyncTallyKPLManual="Yes" 
+	Item			:BLANK	
+	Key Item    	: "Cancel Sales"	  		: A : Call    		: Dyms_CancelSalesDownload:$$SyncTallyKPLManual="Yes"
+	Item			:BLANK	
+	
+[System: Event]
+
+	AutoUpload : Load Company:Yes	: CALL	: AutoUploadTimeFun
+	
+	AutoKPLDownloadUpload : Timer : ($$SyncTallyKPLAuto="Yes") : CALL	: AutoUploadDownloadFun
+	
+[Function: AutoUploadTimeFun]
+	010	: Start Timer: AutoKPLDownloadUpload: 1200
+;	000	: Log:"1st function"
+	
+;; By removing the date condition in the below function will make function to call at every 60 seconds 
+[Function: AutoUploadDownloadFun]
+;	kkk	:	Log:"Function Running every 1 minute"
+;	Variable	: counter1	: Date
+;	variable	: CurrentTime,Attention,AutoSyncJob:String	
+;	Variable	: CTTimeGivenHM		: String	: $$SyncTallyKPLAuto1
+;	000	: Log:##CTTimeGivenHM;"2nd Function"
+;	10	: Set   : CurrentTime : $$Time:$$SysInfo:SystemTime
+;	12	: Set 	: AutoSyncJob : $AutoSyncJob:Company:##SvcurrentCompany
+;	15	: Log:##AutoSyncJob
+	;20	: Set	: Attention : "Something Went Wrong at  " + ##AutoSyncJob +" Job \n Or All the Jobs are not Run \nPlease Contact Support Team!"
+	;11:	Set	: CurrentTimeHM	:($$StringPart:##CurrentTime:0:2)+($$StringPart:##CurrentTime:3:2)
+;	30	: Set : counter1 : $AutoSyncDate:Company:##SvcurrentCompany
+	;22	: if  : ##CurrentTime=##CTTimeGivenHM ;and not ##counter1=$$SysInfo:SystemDate
+;	051 : Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncDate.AutoSyncDate : $$SysInfo:SystemDate
+	101	:	Call	:	Dyms_CustomeDownload
+	202	:	Call	:	Dyms_ProductDownload
+	404	:	Call	:	Dyms_SalesDownload
+;	303	:	Call	:	Dyms_ReceiptDownload
+	310	:	Call	:	Dyms_CreditNoteDownload
+;	410	:	Call	:	Dyms_JournalDownload
+	415	:	Call	:	Dyms_CancelSalesDownload
+;	501	:	End If
+;	201	: if  : ##CurrentTime<##CTTimeGivenHM ;and not ##counter1=$$SysInfo:SystemDate
+;	050 : Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncDate.AutoSyncDate : $$SysInfo:SystemDate
+;	100	:	Call	:	Dyms_CustomeDownload
+;	200	:	Call	:	Dyms_ProductDownload
+;	400	:	Call	:	Dyms_SalesDownload
+;;	300	:	Call	:	Dyms_ReceiptDownload
+;	330	:	Call	:	Dyms_CreditNoteDownload
+;;	440	:	Call	:	Dyms_JournalDownload
+;	500	:	End If
+;	600	: If	: not ##AutoSyncJob = "Inventory" and ##control = Yes
+;	601 : msg Box: "Attention" : ##Attention
+;	597	: Set   :  control: No
+	;599	: Log	: ##Control
+;	602	: End If
+
+[System:Variable]
+	control : Yes
+	
+[Variable:control]
+	Type	: Logical
+		
+
+[Report:Configration]
+	Title	:$$LocaleString:"DHI Configuration"
+	Form	:DHIConfigForm
+	Object	:Company
+	Variable: EnableAutoSyncvar
+	
+[Form:DHIConfigForm]
+	
+	Width	:50% page
+	Height	:85% page
+	Parts	:DHIConfigPart
+
+	On	:	Form Accept	:	Yes	:	Form Accept
+	On	:	Form Accept	:	Yes	:	Call	:	SyncTallyKPLWrite
+	On	:	Form Accept	:	Yes	:	Form Accept
+
+[Part:DHIConfigPart]
+	Lines	: ConfigurationTitle, DHIfilepathvalues, DHICustomerFolderpath, DHICustomerArchive, DHIServiceItemFolderpath, +
+			  DHIServiceItemArchive, DHISalesPath, DHISalesArchive,DHIReceiptPath, DHIReceiptArchive, DHICreditFolderpath, + 
+			  DHICreditArchive, DHIJournalFolderpath, DHIJournalArchive,DHICNLSalesFolderpath, DHICNLSalesArchive, TallyINI Manual Sync, AdvTallyINI Auto Sync Type, +
+			  AdvTallyINI Auto Sync Time, VouchersConfig, CGSTLedgerName, SGSTLedgerName, + 
+			  IGSTLedgerName,/* RoundoffLedgerName,*/, DHIGodownName
+	Scroll	:	Vertical
+	
+[Line:ConfigurationTitle]
+	SpaceTop:	1
+	Fields	: Form Sub Title 
+	Local	:Field	:Form Sub Title		:	Info	:"DHI Folder Configration"
+
+[Line:DHIfilepathvalues]
+	
+	SpaceTop:	0.5
+	Fields	: Medium Prompt,DHIFilepathprompt
+	Local	:Field	:Medium Prompt 		:	Info	:"JSON File Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+ 
+[Field	:DHIFilepathprompt]
+	Use			:	Name Field
+	Style		:	Normal
+	Width		:	@@NameWidth+20
+	Align		:	Left
+    Case        : 	Normal
+	Storage		:	DHIFilepath	
+	
+[Line	:DHICustomerFolderpath]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHICustomerPath
+	Local	:Field	:Long Prompt		:	Info	:"Customer Master JSON Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHICustomerPath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	CustomerFolder
+	
+[Line	:DHICustomerArchive]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHICustomerArchivePath
+	Local	:Field	:Long Prompt		:	Info	:"Customer Master Archive Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHICustomerArchivePath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	CustomerArchiveFolder
+
+[Line	:DHIServiceItemFolderpath]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHIServiceitemPath
+	Local	:Field	:Long Prompt		:	Info	:"Service Item Master JSON Path :"
+	Local	:Field	:Medium Prompt		:	Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHIServiceitemPath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	ServiceItemFolder
+	
+[Line	:DHIServiceItemArchive]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHIServiceItemArchivePath
+	Local	:Field	:Long Prompt		:	Info	:"Service Item Master Archive Path :"
+	Local	:Field	:Medium Prompt		:  	Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHIServiceItemArchivePath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	ServiceItemArchiveFolder
+
+[Line	:DHISalesPath]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHISalesPath
+	Local	:Field	:Long Prompt		:	Info	:"Sales Transaction JSON Path:"
+	Local	:Field	:Medium Prompt		:  	Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHISalesPath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	DHISalesFolder
+	
+[Line	:DHISalesArchive]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHISalesArchivePath
+	Local	:Field	:Long Prompt		:	Info	:"Sales Transaction Archive Path:"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Long Prompt		:	Skip	:	Yes
+
+[Field	:DHISalesArchivePath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	DHISalesArchiveFolder
+	
+[Line	:DHIReceiptPath]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHIReceiptPath
+	Local	:Field	:Long Prompt		:	Info	:"Receipt Transaction JSON Path:"
+	Local	:Field	:Medium Prompt		:  	Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHIReceiptPath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	DHIReceiptFolder
+	
+[Line	:DHIReceiptArchive]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHIReceiptArchivePath
+	Local	:Field	:Long Prompt		:	Info	:"Receipt Transaction Archive Path:"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Long Prompt		:	Skip	:	Yes
+
+[Field	:DHIReceiptArchivePath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	DHIReceiptArchiveFolder
+	
+[Line	:DHICreditFolderpath]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHICreditPath
+	Local	:Field	:Long Prompt		:	Info	:"Credit Note JSON Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHICreditPath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	CreditFolder
+	
+[Line	:DHICreditArchive]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHICreditArchivePath
+	Local	:Field	:Long Prompt		:	Info	:"Credit Note Archive Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHICreditArchivePath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	CreditArchiveFolder
+	
+[Line	:DHIJournalFolderpath]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHIJournalPath
+	Local	:Field	:Long Prompt		:	Info	:"Journal Voucher JSON Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHIJournalPath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	JournalFolder
+	
+[Line	:DHIJournalArchive]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHIJournalArchivePath
+	Local	:Field	:Long Prompt		:	Info	:"Journal Voucher Archive Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHIJournalArchivePath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	JournalArchiveFolder
+	
+[Line	:DHICNLSalesFolderpath]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHICNLSalesPath
+	Local	:Field	:Long Prompt		:	Info	:"Cancel Sales Voucher JSON Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHICNLSalesPath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	DHICNLSalesFolder
+	
+[Line	:DHICNLSalesArchive]	
+	SpaceTop:	0.5
+	Fields	: Long Prompt,DHICNLSalesArchivePath
+	Local	:Field	:Long Prompt		:	Info	:"Cancel Sales Voucher Archive Path :"
+	Local	:Field	:Medium Prompt		:  Style	: Normal  
+	Local	:Field	:Medium Prompt		:	Skip	:	Yes
+
+[Field	:DHICNLSalesArchivePath]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Storage	:	DHICNLSalesArchiveFolder
+
+[Line: TallyINI Manual Sync]
+	SpaceTop:	0.5
+	Field	: Long Prompt, TallyINI Manual Sync Type
+	Local	: Field	: Long Prompt		: Set as	: $$LocaleString:"Enable Manual Tally Sync?"
+
+[Field: TallyINI Manual Sync Type]
+
+	Use			: Logical Field
+	Set By Condition	:	Yes	:	$$SyncTallyKPLManual
+	Set as		: if $$SyncTallyKPLManual="No" then No else Yes
+	Storage		: EnableManualSync
+	Set Always	: Yes
+	Show Table	: Always
+	
+[Function	:	SyncTallyKPLManual]
+	
+	Variable	: LineStr						: String
+	0002	:If:$$IsFileExists:@@TallySynclogfile
+	0005	:	Set File Log On
+;	0007	: 	OPEN FILE : "C:\Program Files\TallyPrime (3.0.1)\TallySync.txt" 	: Text	: READ 
+	0007	: 	OPEN FILE : @@TallySynclogfile 	: Text	: READ 
+	0010	:	WHILE	: Not $$FileIsEOF
+;	0011	:	Msg Box	:	FileRead	:	$$FileRead
+	0020	: 			Set			: LineStr	: $$StringWordEx:$$FileRead:"~":1
+	0030	: 			If 			: NOT $$IsEmpty:##LineStr
+	0040	:				Return	:	##LineStr
+	0050	:			End If
+	0060	:	End While
+	0070	:	Close File
+	0080	:	Set File Log Off
+	0088	:	Else
+	0090	:	Set	:	LineStr	: "No"
+	0100	:	Return:##LineStr
+	12211	:   Log:##LineStr
+	0110	:	End If
+	
+[System	:	Formulae]
+	GetAppPath11			    : $$SysInfo:ApplicationPath
+	TallySynclogfile			: @@GetAppPath11+"\TallySync.txt"
+	Dyms_FilterFiles			: $Name contains ".json" OR $Name contains ".JSON"
+	DHIDatapath					: $DHIFilepath:Company:##SVCurrentCompany
+	
+	DHICustomerFolder         	: $CustomerFolder:Company:##SVCurrentCompany
+	DHICustomerFolderArc       	: $CustomerArchiveFolder:Company:##SVCurrentCompany
+	DHICustomerfilepatch		: @@DHIDatapath + "\" + @@DHICustomerFolder
+	DHICustomerfileArchpatch	: @@DHIDatapath + "\" + @@DHICustomerFolderArc
+	Dyms_CustomerFilter			: $CUSTOMERNAMES=##Dyms_CustomerName
+	DHICustomerLogfilepatch		: @@DHICustomerfilepatch + "\Customerlog.txt"
+
+	DHIProductFolder         	: $ServiceItemFolder:Company:##SVCurrentCompany
+	DHIProductFolderArc       	: $ServiceItemArchiveFolder:Company:##SVCurrentCompany
+	DHIProductfilepatch			: @@DHIDatapath + "\" + @@DHIProductFolder
+	DHIProductfileArchpatch		: @@DHIDatapath + "\" + @@DHIProductFolderArc
+	Dyms_ServiceitemFilter		: $ITEMNAME=##Dyms_ServiceItemName
+	DHIProductLogfilepatch		: @@DHIProductfilepatch + "\ServiceItemLog.txt"
+
+	DHISalesFolder         		: $DHISalesFolder:Company:##SVCurrentCompany
+	DHISalesFolderArc       	: $DHISalesArchiveFolder:Company:##SVCurrentCompany
+	DHISalesfilepatch			: @@DHIDatapath + "\" + @@DHISalesFolder
+	DHISalesfileArchpatch		: @@DHIDatapath + "\" + @@DHISalesFolderArc
+	DHISaleslogfilepatch		: @@DHISalesfilepatch + "\SalesLog.txt"
+	
+	DHIIGSTLedger	         	: $IGSTLedgerName:Company:##SVCurrentCompany
+	DHICGSTLedger		       	: $CGSTLedgerName:Company:##SVCurrentCompany
+	DHISGSTLedger				: $SGSTLedgerName:Company:##SVCurrentCompany
+	
+[Function	:	SyncTallyKPLWrite]
+	Variable	:	Storefiledata1	:	String
+	Variable	:	Storefiledata2	:	String
+	Variable	:	Storefiledata3	:	String
+	0002:	Set	:	Storefiledata1	:	$EnableManualSync
+	0004:	Set	:	Storefiledata2	:	$EnableAutoSync
+	0005:	Set	:	Storefiledata3	:	$$String:$AutoSyncTime
+	0006:	Delete File:@@TallySynclogfile
+	0007: 	OPEN FILE : @@TallySynclogfile	: Text	: Write
+	0010	:	Write File Line	:	##Storefiledata1+"~"+##Storefiledata2+"~"+##Storefiledata3
+;	0010:	WHILE	: Not $$FileIsEOF
+;	0020		: 			Set			: LineStr	: $$StringWordEx:$$FileRead:"~":1
+;	0030		: 			If 			: NOT $$IsEmpty:##LineStr
+;	0040		:				Return	:	##LineStr
+;	0050		:			End If
+;	0060:	End While
+	0070:	Close Target File
+;	0080:	Set File Log Off
+
+[Line: AdvTallyINI Auto Sync Type]
+	SpaceTop:	0.5
+	Field	: Long Prompt, TallyINI Auto Sync Type
+	Local	: Field	: Long Prompt		: Set as	: $$LocaleString:"Enable Automatic Tally Sync?"
+
+[Field: TallyINI Auto Sync Type]
+
+	Use			: Logical Field
+	Set By Condition	:	Yes	:	$$SyncTallyKPLAuto
+	Set as		: (if $$SyncTallyKPLAuto="No" then No else Yes) and ##EnableAutoSyncvar
+	Storage		: EnableAutoSync
+	Set Always	: Yes
+	Show Table	: Always
+	Modifies	: EnableAutoSyncvar	: Yes
+
+
+[Function	:	SyncTallyKPLAuto]
+	
+	Variable	: LineStr						: String
+	0002	:If:$$IsFileExists:@@TallySynclogfile
+	0005	:	Set File Log On
+;	0007	: 	OPEN FILE : "E:\TallyProjects\New folder\Vigneshwara Paints\TDL\Phase I\Tamilword1.txt" 	: Text	: READ 
+	0007	: 	OPEN FILE : @@TallySynclogfile 	: Text	: READ 
+	0010	:	WHILE	: Not $$FileIsEOF
+	0020		: 			Set			: LineStr	: $$StringWordEx:($$StringWordEx:$$FileRead:"~":2):"~":1
+	0030		: 			If 			: NOT $$IsEmpty:##LineStr
+	0040		:				Return	:	##LineStr
+	0050		:			End If
+	0060	:	End While
+	0070	:	Close File
+	0080	:	Set File Log Off
+	0088	:	Else
+	0090	:	Set	:	LineStr	: "No"
+	0100	:	Return:##LineStr
+	0110	:	End If
+	
+	[Line: AdvTallyINI Auto Sync Time]
+		SpaceTop:	0.5
+
+		Field	: Long Prompt, TallyINI Auto Sync Time,TallyINI Auto Sync Date;,TallyINI Auto Sync Job,TallyINI Auto Sync All Job
+		Local	: Field	: Long Prompt		: Set as	: $$LocaleString:"Enter Auto Sync Time:"
+		Local	: Field	: Long Prompt		: Inactive	: NOT ##EnableAutoSyncvar
+		Invisible	: Yes
+		
+		[Field: TallyINI Auto Sync Time]
+
+			Use			: Short Name Field
+			Width		: 10
+			Type		: Time	;: Forced
+			Set By Condition	:	Yes	:	$$SyncTallyKPLAuto1
+			Set as		: if $$SyncTallyKPLAuto1="No" then No else Yes
+			Storage		: AutoSyncTime
+			Format		: "12 hour";##TSPLSmpCDTFormatVar;"H,M"
+			Set Always	: Yes
+			Inactive	: NOT ##EnableAutoSyncvar
+			
+		[Field:TallyINI Auto Sync Date]
+			Use	: Short Name field
+			Type: Date
+			Set as	: $$Value;$$SysInfo:SystemDate
+			Storage	: AutoSyncDate
+			Set Always: Yes
+			Skip	: Yes
+			
+[System:Variable]
+	EnableAutoSyncvar : No
+	
+[Variable: EnableAutoSyncvar]
+	
+	Type	: Logical
+	Persist	: Yes
+	
+[Function	:	SyncTallyKPLAuto1]
+	
+	Variable	: LineStr						: String
+	0002	:If:$$IsFileExists:@@TallySynclogfile
+	0005:	Set File Log On
+;	0007: 	OPEN FILE : "E:\TallyProjects\New folder\Vigneshwara Paints\TDL\Phase I\Tamilword1.txt" 	: Text	: READ 
+	0007: 	OPEN FILE : @@TallySynclogfile 	: Text	: READ 
+	0010:	WHILE	: Not $$FileIsEOF
+	0020		: 			Set			: LineStr	: $$StringWordEx:$$FileRead:"~":3
+	;0021		:			Log			: ##LineStr + "Fun"
+	0030		: 			If 			: NOT $$IsEmpty:##LineStr
+	0040		:				Return	:	##LineStr
+	0050		:			End If
+	0060:	End While
+	0070:	Close File
+	0080:	Set File Log Off
+	0088	:	Else
+	0090	:	Set	:	LineStr	: "No"
+	0100	:	Return:##LineStr
+	0110	:	End If
+	
+[Line	:VouchersConfig]
+	SpaceTop:	1
+	Fields	: Form Sub Title 
+	Local	:Field	:Form Sub Title		:	Info	:"Transactions Configuration"
+	
+[Line	:CGSTLedgerName]	
+	SpaceTop:	0.5
+	Fields	: Medium Prompt,CGSTLedgerName
+	Local	:Field	:Medium Prompt	:  Info	:"CGST Ledger Name :"
+	Local	:Field	:Medium Prompt	:  Style: Normal  
+	Local	:Field	:Medium Prompt	:  Skip	:	Yes
+
+[Field	:CGSTLedgerName]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Table	:	GST Ledger Table
+	Show Table	:	On First Key
+	Storage	:	CGSTLedgerName
+	
+[Line	:SGSTLedgerName]	
+	SpaceTop:	0.5
+	Fields	: Medium Prompt,SGSTLedgerName
+	Local	:Field	:Medium Prompt	:  Info	:"SGST Ledger Name :"
+	Local	:Field	:Medium Prompt	:  Style: Normal  
+	Local	:Field	:Medium Prompt	:  Skip	:	Yes
+
+[Field	:SGSTLedgerName]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Table	:	GST Ledger Table
+	Show Table	:	On First Key
+	Storage	:	SGSTLedgerName
+	
+[Line	:IGSTLedgerName]	
+	SpaceTop:	0.5
+	Fields	: Medium Prompt,IGSTLedgerName
+	Local	:Field	:Medium Prompt	:  Info	:"IGST Ledger Name :"
+	Local	:Field	:Medium Prompt	:  Style: Normal  
+	Local	:Field	:Medium Prompt	:  Skip	:	Yes
+
+[Field	:IGSTLedgerName]
+	Use		:	Name Field
+	Style	:	Normal
+	Width	:	@@NameWidth+10
+	Align	:	Left
+	Table	:	GST Ledger Table
+	Show Table	:	On First Key
+	Storage	:	IGSTLedgerName
+	
+;[Line	:RoundoffLedgerName]	
+;	SpaceTop:	0.5
+;	Fields	: Medium Prompt,RoundoffLedgerName
+;	Local	:Field	:Medium Prompt	:  Info	:"Roundoff Ledger Name :"
+;	Local	:Field	:Medium Prompt	:  Style: Normal  
+;	Local	:Field	:Medium Prompt	:  Skip	:	Yes
+;
+;[Field	:RoundoffLedgerName]
+;	Use		:	Name Field
+;	Style	:	Normal
+;	Width	:	@@NameWidth+10
+;	Align	:	Left
+;	Table	:	Round Ledger Table
+;	Show Table	:	On First Key
+;	Storage	:	RoundoffLedgerName
+	
+;[Line	:DHIGodownName]	
+;	SpaceTop:	0.5
+;	Fields	: Medium Prompt,DHIGodownName
+;	Local	:Field	:Medium Prompt	:  Info	:"Godown Name :"
+;	Local	:Field	:Medium Prompt	:  Style: Normal  
+;	Local	:Field	:Medium Prompt	:  Skip	:	Yes
+;
+;[Field	:DHIGodownName]
+;	Use		:	Name Field
+;	Style	:	Normal
+;	Width	:	@@NameWidth+10
+;	Align	:	Left
+;	Table	:	List of Godowns
+;	Show Table	:	On First Key
+;	Storage	:	DHIGodownName
+;	
+[Collection : GST Ledger Table]
+
+    Use         : VLedTable
+    Type        : Ledger
+    Include     : Group:$$GroupDuties
+
+[System:UDF]
+	
+	DHIFilepath 			:	String	: 20001	
+	CustomerFolder			:	String	: 20002
+	CustomerArchiveFolder	:	String	: 20003
+	ServiceItemFolder		:	String	: 20004
+	ServiceItemArchiveFolder:	String	: 20005
+	DHISalesFolder			:	String	: 20006
+	DHISalesArchiveFolder	:	String	: 20007
+	CreditFolder			:	String	: 20008
+	CreditArchiveFolder		:	String	: 20009
+	JournalFolder			:	String	: 20010
+	JournalArchiveFolder	:	String	: 20011
+	DHIReceiptFolder		:	String	: 20012
+	CGSTLedgerName			:	String	: 20013
+	SGSTLedgerName			:	String	: 20014
+	IGSTLedgerName			:	String	: 20015
+	RoundoffLedgerName		:	String	: 20016
+	DHIGodownName			:	String	: 20017
+	DHIReceiptArchiveFolder	:	String	: 20018
+	EnableManualSync		:	Logical	: 20020
+	EnableAutoSync			:	Logical	: 20025
+	AutoSyncDate			:	Date	: 20026
+	AutoSyncTime			:	Time	: 20028
+	SalesSERVICEDATE		:	Date	: 20030 
+	ServiceToDate			:	Date	: 20032
+	VCHSalesQRCodeSt		:	String	: 20035
+	VCHCreditQRCodeSt		:	String	: 20040
+	DHICNLSalesFolder		:	String	: 20045
+	DHICNLSalesArchiveFolder:	String	: 20050

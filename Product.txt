@@ -1,0 +1,277 @@
+;;;;; Jai Shree Ram ;;;;;;;;
+
+[Collection: Dyms_DirectoryProdtColl]
+	
+	Data Source : Directory	: @@DHIProductfilepatch 
+	Filter		: Dyms_FilterFiles
+	Format		: $Name, 25
+	Title       : "File Listing"
+	Sub Title	: "File Name", "File Size", "Read Only"
+
+;select $name from Dyms_DirectoryProdtColl
+[Collection	:Dyms_ServiceitemCollection]
+	
+	Data Source	: File JSON		: ##Dyms_LocalFileNames;@@DHIProductfilepatch + "\" + "serviceItem.json";
+	JSON Object Path	: "items:1"
+	Fetch	: SERVICENAME
+
+;select $SERVICENAME from Dyms_ServiceitemCollection
+[Collection:Dyms_ServiceitemDetails]
+	
+	Source Collection:Dyms_ServiceitemCollection
+	Compute		:	ITEMNAME				:	$$String:$SERVICENAME
+	Walk		: ITEMDETAILS
+	Compute		: HSNCODE						: $HSNCODE
+	Compute		: IGSTPERC						: $IGSTPERC
+	Compute		: CGSTPERC						: $CGSTPERC
+	Compute		: SGSTPERC						: $SGSTPERC 
+	Compute		: APPLICABLEDATE				: $APPLICABLEDATE
+	Compute		: GSTTaxability					: $GSTTaxability
+	Compute		: GSTApplicability				: $GSTApplicability
+	Compute		: GSTCalcType					: $GSTCalcType
+	Filter		:Dyms_ServiceitemFilter
+	
+
+[Function:Dyms_ProductDownload]
+
+	Variable	:Dyms_ServiceItemName	:String
+	Variable	:Dyms_ServiceItemParent	:String
+	Variable	:Dyms_ServiceItemUnit	:String	
+	Variable	:Dyms_SERVICEMRP		:Number	
+	Variable	:Dyms_HSNCODE			:Number	
+	Variable	:Dyms_IGSTPERC			:Number
+	Variable	:Dyms_CGSTPERC			:Number
+	Variable	:Dyms_SGSTPERC			:Number
+	Variable	:Dyms_APPLICABLEDATE	:String
+	Variable	:Dyms_GSTTaxability		:String
+	Variable	:Dyms_GSTApplicability	:String
+	Variable	:Dyms_GSTCalcType		:String
+	Variable	:Dyms_LocalFileNames	:String
+	Variable	:Dyms_Service_Count		:Number	
+	Variable	:Errorcount				:Number	: 0
+;	variable	:StockGroupProgressCount1	: Number : 1
+	Variable	:Dyms_CountrMsgVAr1			:String
+	Variable	:DymsLocalHostPathRetailer,DymsFTPPathRetailer		: String
+	
+	00	:	Log: "ServiceItem is Running"	
+	020 :	Set			: DymsLocalHostPathRetailer			:	@@DHIProductfilepatch
+;	030 :	Set			: DymsFTPPathRetailer			:$$MakeFTPName:"ftp://34.121.104.138":"fsm_ftp_usr":"@FSM1234":"customer"+"/customer.json"
+ 	030 :	Set			: DymsFTPPathRetailer			:$$IsEmptyCollection:Dyms_DirectoryProdtColl;$$MakeFTPName:@@DymcsFTPName:@@DymcsDataAdmin:@@DymcsDataPassword:@@DymcsFTPCustomerFolder
+
+	034	:	If:$$IsInternetActive
+;	02  :   Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncJob.AutoSyncJob : "Customer"
+;	03  :   Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncAllJob.AutoSyncAllJob : ""
+	035	:	If:NOT $$IsEmptyCollection:Dyms_DirectoryProdtColl 
+; 	032:	Msg Box	:	DymsFTPPathRetailer	:	##DymsFTPPathRetailer
+;	036	:	Set	:	Dyms_CountrMsgVAr1	:	$$NumItems:Dyms_FTPDirectoryVoucherColl 
+;	037	:	Start Progress:(##Dyms_CountrMsgVAr1) : "Downloading Json Files From FTP" : "Please wait" : ""
+; 	040 :	Walk Collection	:	Dyms_FTPDirectoryVoucherColl;If:not $$IsFileExists:##DymsFTPPathRetailer
+;	
+;  	;055 : 	Copy File		: ##DymsLocalHostPathRetailer	:   @@RetailerDownloadFTP+"/"+$Name;customer.json";@@Retailerxmls
+;	;055a: Log: ##DymsLocalHostPathRetailer
+;	056	:	Show Progress:$$LoopIndex:$$Sprintf:" %s %s":($$LocaleString:"Downloading.."):($Name)
+;	060	:	End Walk
+;	061	:	End Progress
+	065	: Walk Collection	:	Dyms_DirectoryProdtColl
+	068	:	Set	:	Dyms_LocalFileNames	:	""
+	070	:	Set	:	Dyms_LocalFileNames	:	@@DHIProductfilepatch+"\"+$Name
+;	085:End If
+	80	:	Set:Dyms_Service_Count:$$NumItems:Dyms_ServiceitemCollection
+
+	85	:	If:##Dyms_Service_Count>0
+	88	:	Start Batch Post:100
+	
+	;;;;;;;;;;;;;;;; Service Item Log File ;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+	121		: 	Set File Log On
+	122		: 	OPEN FILE :@@DHIProductLogfilepatch:Text:Write 
+	123		:	Write File Line	: "==========================================================================="
+	124		: 	Write File Line	: "Total Service Items to Import - "+$$String:(##Dyms_Service_Count)+" On "+$$String:($$MachineDate)+"-"+$$String:($$MachineTime)
+	125		:	Close Target File
+	126		:	Set File Log Off
+	
+	90 		: Start Progress: ##Dyms_Service_Count :($$LocaleString:"Importing"):"Service Items " : ""
+	110s	:	Set	:	Dyms_ServiceItemName		:""
+	111a	:	Set	:	Dyms_ServiceItemParent		:""
+	120a	:	Set	:	Dyms_SERVICEMRP				:""
+	115n	:	Set	:	Dyms_ServiceItemUnit		:""
+	
+	100		: Walk Collection:Dyms_ServiceitemCollection
+	110		:	Set :	Dyms_ServiceItemName		:$SERVICENAME	
+	111		:	Set :	Dyms_ServiceItemParent		:$SERVICEGROUP
+	115		:	Set :	Dyms_ServiceItemUnit		:$SERVICEUNIT				
+
+	120		: Set	:	Dyms_SERVICEMRP			: $SERVICEMRP
+	
+	158a	:	Set	:	Dyms_HSNCODE				:""
+	159b	:	Set	:	Dyms_IGSTPERC				:""
+	160c	:	Set	:	Dyms_CGSTPERC				:""
+	161d	:	Set	:	Dyms_SGSTPERC				:""
+	158e	:	Set	:	Dyms_APPLICABLEDATE	    	:""
+    159f	:	Set	:	Dyms_GSTTaxability		    :""
+    160g	:	Set	:	Dyms_GSTApplicability	    :""
+    161h	:	Set	:	Dyms_GSTCalcType		    :""
+	         
+	156		: Walk Collection:Dyms_ServiceitemDetails
+	158		:	Set	:	Dyms_HSNCODE				:$HSNCODE			
+	159		:	Set	:	Dyms_IGSTPERC				:$IGSTPERC			
+	160		:	Set	:	Dyms_CGSTPERC				:$CGSTPERC			
+	161		:	Set	:	Dyms_SGSTPERC				:$SGSTPERC			
+	158p	:	Set	:	Dyms_APPLICABLEDATE	   		:$APPLICABLEDATE	
+    159q	:	Set	:	Dyms_GSTTaxability		    :$GSTTaxability		
+    160r	:	Set	:	Dyms_GSTApplicability	    :$GSTApplicability	
+    161s	:	Set	:	Dyms_GSTCalcType		    :$GSTCalcType		
+
+	398     :   Do If :($$IsEmpty:($name:StockItem:##Dyms_ServiceItemName))        : New Object        : StockItem
+    400     :   Do If :(Not $$IsEmpty:($name:StockItem:##Dyms_ServiceItemName))    : New Object        : StockItem	:##Dyms_ServiceItemName    :Yes
+	
+	;if $$IsEmpty:($name:StockItem:##Dyms_ServiceItemName) then $$String:##Dyms_ServiceItemName else $name:StockItem:##Dyms_ServiceItemName
+	401		:	Set Value				    : 	Name		      :	##Dyms_ServiceItemName
+	402     :	Set Value					:   Parent            :	if $$IsEmpty:($name:StockGroup:##Dyms_ServiceItemParent) then $$StockItemgroupfun:##Dyms_ServiceItemParent else ##Dyms_ServiceItemParent;$Parent:StockItem:##Dyms_ServiceItemName
+	1030 	: Show Progress:$$LoopIndex:$$Sprintf:" %s %s":($$LocaleString:"Importing Service Item  "):(##Dyms_ServiceItemName)
+	535		:	Set Value					:	Baseunits			 :	##Dyms_ServiceItemUnit
+	540		:	Set Value					:	GSTAPPLICABLE		 :	##Dyms_GSTApplicability
+	545		:	Set Value					:	GSTTYPEOFSUPPLY		 :	$$SysName:Services
+
+	495		: ExecuteObjectMap: DHIGSTUpdateMstRateDetails
+	bxb		: ExecuteObjectMap: UpdateMstHSNDetails
+	600		: ExecuteObjectMap: UpdateMstMRPDetails
+
+	633		:  Set Target	:..
+	1000    :  Save Target
+;	1001	:	End Walk
+;	1005   	:   End if
+	
+;;;;;;;;;;;;; Log File ;;;;;;;;;;;;;;;;;;;;
+	1060 : IF:not $$LastResult
+	5004 :   Set File Log On
+	5005 :   OPEN FILE :@@DHIProductLogfilepatch:Text:Write 
+	5010 :	 Write File Line	: $$String:($$LastError)
+	5020 :	 Write File Line	: $$String:"Error from :"+$$String:##Dyms_ServiceItemName
+	5030 :	 Set File Log Off
+	5040 :	 Close Target File
+	1040 : 	Increment: Errorcount
+	1188 : End If
+	1020 : End Walk
+	1200 : End Walk
+ 
+	;;;;;;;;;;;;;;;; Error Message ;;;;;;;;;;;;;;;;
+	LocalFormula:	DateTimeFolderNN	:	$$LocaleString:($$YearOfDate:$$MachineDate)+$$LocaleString:"-"+$$LocaleString:($$ZeroFill:($$MonthOfDate:$$MachineDate):2)+$$LocaleString:"-"+$$LocaleString:($$ZeroFill:($$DayOfDate:$$MachineDate):2)+$$LocaleString:"-"+$$LocaleString:($$StringFindAndReplace:($$MachineTime):":":"-")
+	9191 : If: ##Errorcount = 0
+	1201 : 	Copy File		: @@DHIProductfileArchpatch+ "\" + @DateTimeFolderNN + "\"	:   ##Dyms_LocalFileNames
+	1202 :	Delete File:##Dyms_LocalFileNames;@@LocalDeletefile
+	1210 :	Log: "Status : Process Completed! Service Items Imported Successfully!! "
+	1205 : Else
+	1219 :	Log: "Status : Error While Importing!! Please Refer Log File  " +$$LocaleString:@@DHIProductLogfilepatch
+	1040a: Decrement: Errorcount
+	1220 : End If
+	
+ 	1288 : End Progress
+	1330 : End Batch Post
+	1331 : Else
+;	1332 : Msg Box:"Warning":"No Customer"
+	1400 : End If
+	1410 : End Walk
+	
+	12780 : Else
+	12790 : Log	:"No Data File In ServiceItem Folder"
+	12800 : 	End If
+	12810 : Else
+	12820 : Msg Box	:	"Warning !":"Check Internet Availability!!"
+	12830 : 	End If
+	
+
+[Object Map:UpdateMstMRPDetails]
+	Target Object Ex	: MRPDetails
+	   Set as	: FromDate		: ##Dyms_APPLICABLEDATE
+	   
+	   Object Map: UpdateMstMRPRateDetails
+	   
+[Object Map:UpdateMstMRPRateDetails]
+	
+	Variable: Statenm	:	String	:	$$SysName:Any
+	Variable: DHIMRPRate:	Rate	:	($$TgtObject:($$AsRate:##Dyms_SERVICEMRP));$$AsRate:##Dyms_SERVICEMRP;+"/NOS"
+	
+	Target Object Ex	: MRPRateDetails
+	Set as	: StateName		: ##Statenm;If (##vRBVATStateName="Any" OR $$IsSysName:##vRBVATStateName OR $$IsEmpty:##vRBVATStateName) Then $$SysName:Any Else ##vRBVATStateName
+	Set as	: MRPRate		: ##DHIMRPRate
+	
+[Object Map:DHIGSTUpdateMstRateDetails]
+	Delete Collection Object:GSTDetails
+	Object Map:DHIGSTUpdateMstRateDetails1
+	
+[Object Map: DHIGSTUpdateMstRateDetails1]
+
+	Variable		: GSTAppFromDate		: String		: $$SysName:SpecifyDetailsHere
+	Variable		: vGSTAllowRates		: Logical
+	
+	Target Object Ex: GSTDetails ;: Last : @@IsGSTApplDateFound
+
+	Set as			: Applicablefrom			: ##Dyms_APPLICABLEDATE
+	Set as			: SrcofGSTDetails			: ##GSTAppFromDate
+;	Set as			: HSNMasterName				: (If $$IsSysNameEqual:UseGSTClassif:##vSrcofGSTDetails Then ##vGSTClsfnName Else "")   : Yes
+	Set as			: Taxability				: ##Dyms_GSTTaxability;(If ##vIsSpecifyRates Then ##vGSTTaxability Else "")	: Yes
+;	Set as			: GSTNatureofTransaction	: (If ##vIsSpecifyRates AND (If ##vSales Then ##vIsSalesNature Else If ##vPurchase Then NOT ##vIsSalesNature Else Yes) Then ##vGSTNatureofTrans Else ""): Yes
+;	Set as     		: IsReversechargeapplicable : (If ##vIsSpecifyRates AND $$IsSysNameEqual:Taxable:##vGSTTaxability Then ##vGSTIsReverchargeAppl Else No) : Yes
+;	Set as			: Gstineligibleitc			: (If NOT ##vSales AND ((##vIsSpecifyRates AND $$IsSysNameEqual:Taxable:##vGSTTaxability) OR ##vIsSpecifySlabRates) Then ##vGSTIneligibleitc Else Yes) : Yes
+;	Set as			: IncludeExpForSlabCalc		: (If ##vIsSpecifySlabRates Then ##vGSTInclExpForSlabCalc Else No)
+;	Set as			: GSTCalcSlabOnMRP			: (If ##vIsSpecifySlabRates Then ##vGSTCalcSlabOnMRP Else No)
+	
+	Object Map		: GSTUpdateMstStatewiseObjMap1
+	
+	[Object Map : GSTUpdateMstStatewiseObjMap1]
+
+		Target Object Ex: StateWiseDetails	;: 1 : @@IsAnyState
+		Set as			: StateName	: ($$SysName:Any)  : Yes
+		Object Map		: GSTUpdateIGSTObjMap, GSTUpdateCGSTObjMap, GSTUpdateSGSTObjMap, 
+		Delete Collection Object: MRPDetails								
+			[Object Map: GSTUpdateCGSTObjMap]
+
+				Target Object Ex: RateDetails	: 1 : @@IsCGST
+
+				Set as			: GSTRateDutyHead		: ($$SysName:CGST)		: Yes
+				Set as			: GSTRate				: ##Dyms_CGSTPERC;(If ##vGSTAllowRates Then ##vCGSTRate Else 0) : Yes
+				Set as			: GSTRateValuationType	: ($$SysName:BasedOnValue) 	: Yes
+
+			[Object Map: GSTUpdateSGSTObjMap]
+
+				Target Object Ex: RateDetails	: 1 : @@IsSUTGST
+
+				Set as			: GSTRateDutyHead		: ($$SysName:SUTGST)	: Yes
+				Set as			: GSTRate				: ##Dyms_SGSTPERC;(If ##vGSTAllowRates Then ##vSGSTRate Else 0) : Yes
+				Set as			: GSTRateValuationType	: ($$SysName:OnValue) 	: Yes
+
+			[Object Map: GSTUpdateIGSTObjMap]
+
+				Target Object Ex: RateDetails	: 1 : @@IsIGST
+
+				Set as			: GSTRateDutyHead		: ($$SysName:IGST)		: Yes
+				Set as			: GSTRate				: ##Dyms_IGSTPERC;(If ##vGSTAllowRates Then ##vIGSTRate Else 0) : Yes
+				Set as			: GSTRateValuationType	: ($$SysName:OnValue) 	: Yes
+				Delete Collection Object	:	HSNDetails
+				
+[Object Map: UpdateMstHSNDetails]
+	
+	Variable		: GSTAppFromDate	: String	: $$SysName:SpecifyDetailsHere;##vHSNApplicableFrom
+
+	Target Object Ex: HSNDetails	;: Last 		: @@IsGSTApplDateFound
+
+	Set as			: Applicablefrom			: ##Dyms_APPLICABLEDATE
+	Set as			: SrcofHSNDetails			: ##GSTAppFromDate
+
+    Set as     		: HSNClassificationName		: (If $$IsSysNameEqual:UseGSTClassif:##vSrcofHSNDetails Then ##vHSNClassificationName Else "")		: Yes
+	Set as			: HSNCode					: ##Dyms_HSNCODE;(If $$IsSysNameEqual:SpecifyDetailsHere:##vSrcofHSNDetails Then ##vHSNCode Else "") 				: Yes
+	Set as			: HSN						: (If $$IsSysNameEqual:SpecifyDetailsHere:##vSrcofHSNDetails Then ##vHSN Else "") 					: Yes
+
+
+[Function:StockItemgroupfun]
+	
+	Parameter: NGroupName	: String
+	;Parameter: EGroupName	: String
+	
+	00	: Set:NGroupName	: ##Dyms_ServiceItemParent
+	01	: NEW OBJECT	: StockGroup
+	02	: SET VALUE		: Name			: ##NGroupName
+	03	: SET VALUE		: Parent		: $$SysName:Primary;##EGroupName
+	04	: CREATE TARGET
+	;05	: Log: "New Stock Group Created"
+	06	: Return:##NGroupName

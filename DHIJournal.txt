@@ -1,0 +1,170 @@
+;;;; Jai Shree Ram ;;;;;
+
+[Collection: Dyms_DirectoryVoucherCollJrnl]
+	
+	Data Source : Directory	: @@DHIJrnlfilepatch     
+	Filter		: Dyms_FilterFiles
+	Format		: $Name, 25
+	Title       : "File Listing"
+	Sub Title	: "File Name", "File Size", "Read Only"
+	
+;Select $name from Dyms_DirectoryVoucherCollJrnl
+
+[Collection	:DymsJsonJrnlCollection]
+	
+		Data Source:File JSON		: ##Dyms_LocalFileNames ;@@DHIJrnlfilepatch+"\"+$Name;
+   	  	JSON Object Path			: "JOURNAL:1"
+		
+;Select $JOURNALNUMBER from DymsJsonJrnlCollection
+
+[System:Formulae]
+	
+	DHIJrnlFolder         		: $JournalFolder:Company:##SVCurrentCompany
+	DHIJrnlFolderArc       		: $JournalArchiveFolder:Company:##SVCurrentCompany
+	DHIJrnlfilepatch			: @@DHIDatapath + "\" + @@DHIJrnlFolder
+	DHIJrnlfileArchpatch		: @@DHIDatapath + "\" + @@DHIJrnlFolderArc
+	DHIJrnllogfilepatch			: @@DHIJrnlfilepatch + "\JrnlLog.txt"
+	
+
+[Function:Dyms_JournalDownload]
+	
+	Variable	: 	DymsLocalPathSalesDownload		: String
+	Variable	:	DymsJrnlLogCount				:Number
+	Variable	:	Dyms_VoucherNumberVar			:STring
+	Variable	:	Dyms_VoucherDateVar				:STring
+	Variable	:	Dyms_AgnstSalesNo				:String
+	Variable	:	Dyms_PartyNameEVar				:STring	
+	Variable	:	Dyms_PartyNameVar				:STring	
+	Variable	:	Dyms_PartyVCHAMOUNTVar			:STring	
+	Variable	:	Dyms_REMARKNOTEVar				:String
+	
+;	Variable	:	Dyms_TRANSACTIONTYPEVar				:String
+	Variable	:	Dyms_AccountLEDGERNAME				:String
+;	Variable	:	Dyms_DiscountPercsVar				:String
+	Variable	:	Dyms_LocalFileNames					:String
+
+	Variable	: 	Errcount							:Number: 0 
+	Variable	:	Dyms_CountrMsgVAr1,Dyms_CountrMsgVAr2:String
+ 	Variable	: 	DymsLocalHostPathRetailer,DymsFTPPathRetailer	: String				
+	Variable	:   DymsLocalHostPathUploadDown			: String				
+;	Variable	:	DymsJournalAmount					: String
+	Variable	:   Dyms_CountrMsgVAr3					: String
+	
+	00		: 	Log: "Journal Is Running"	
+ 	020 	:	Set			: DymsLocalHostPathRetailer		:	@@DHIJrnlfilepatch;
+ 	030 	:	Set			: DymsFTPPathRetailer			:$$IsEmptyCollection:Dyms_DirectoryVoucherCollJrnl;$$MakeFTPName:@@DymcsFTPName:@@DymcsDataAdmin:@@DymcsDataPassword:@@DymcsFTPCustomerFolder
+;	032		:	Msg Box	:	DymsFTPPathRetailer	:	##DymsFTPPathRetailer
+	034		:	If:$$IsInternetActive
+;	023  	:   Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncJob.AutoSyncJob : "Sales"
+;	03  	:   Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncAllJob.AutoSyncAllJob : ""
+	035		:	If:NOT $$IsEmptyCollection:Dyms_DirectoryVoucherCollJrnl 
+
+	065		:	Walk Collection	:	Dyms_DirectoryVoucherCollJrnl
+	068		:	Set	:	Dyms_LocalFileNames	:	""
+	070		:	Set	:	Dyms_LocalFileNames	:	@@DHIJrnlfilepatch+"\"+$Name
+;	072:	Msg Box	:	Dyms_LocalFileNames	:	##Dyms_LocalFileNames
+	100 	:   Set :	DymsJrnlLogCount:$$NumItems:DymsJsonJrnlCollection
+
+	105		:   If:##DymsJrnlLogCount>0
+	120		:  	Start Batch Post:100
+	
+;;;;;;;;;;;;;;;; Journal Log File ;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+	121		: 	Set File Log On
+	122		: 	OPEN FILE :@@DHIJrnllogfilepatch:Text:Write 
+	123		:	Write File Line	: "==========================================================================="
+	124		: 	Write File Line	: "Total Journal Vouchers to Import - "+$$String:(##DymsJrnlLogCount)+" On "+$$String:($$MachineDate)+"-"+$$String:($$MachineTime)
+	125		:	Close Target File
+	126		:	Set File Log Off
+	
+	127		:	Set	:	Dyms_CountrMsgVAr1	:	$$NumItems:DymsJsonJrnlCollection 
+	128		:	Start Progress:(##Dyms_CountrMsgVAr1) : ($$LocaleString:"Importing Journals") : "Please wait" : ""
+	129		:	Set	: Dyms_VoucherNumberVar	:	""
+	130		:	Walk Collection:DymsJsonJrnlCollection
+	135		:	Set: Dyms_VoucherNumberVar		:$$String:$JOURNALNUMBER
+	136		:	Set: Dyms_VoucherDateVar		:$JOURNALDATE;Dyms_VoucherDate
+	136a	:	Set: Dyms_AgnstSalesNo			:$AGSTREFSALENUMBER
+	144		:	Set: Dyms_PartyVCHAMOUNTVar		:$TDSAMOUNT;Dyms_PartyVCHAMOUNT
+	137		:	Set: Dyms_PartyNameVar			:$CUSTOMERLEDGERNAME;Dyms_PartyName	
+	148		:	Set: Dyms_AccountLEDGERNAME		:$TDSLEDGERNAME
+;	149		:	Set: Dyms_TRANSACTIONTYPEVar	:$TRANSACTIONTYPE
+	145a	:	Set: Dyms_PartyNameEVar			:($Name:Ledger:##Dyms_PartyNameVar)
+	146d	:	Set: Dyms_REMARKNOTEVar			:$NARRATION
+
+;;;;;;;;;;;;; Journal Creation ;;;;;;;;;;;;;;;;
+
+	150	:	New Object	:	Voucher
+	155	:		Set			:	SVViewName		:	$$SysName:AcctgVchView
+	700	: 		Set Value	:	PersistedView	:	##SVViewName ;$$SysName:AcctgVchView;
+	170	:		Set Value	:	Date			:	$$Date:##Dyms_VoucherDateVar ;"01.05.2021"
+	165	:		Set Value	: 	VoucherNumber	: 	##Dyms_VoucherNumberVar
+	180	:		Set	Value	:	VoucherTypeName	:	$$String:"Journal" ;$$VchTypeJournal
+	185	:		Set Value	:	IsInvoice		:	No
+	210a:  		Set Value	: 	Narration		:  $$String:##Dyms_REMARKNOTEVar
+	
+	400	:			Insert Collection Object	:	AllLedger Entries
+	410	:				Set Value	:	LedgerName				:	##Dyms_AccountLEDGERNAME
+	430	:				Set Value	:	Amount					:	$$Negative:$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000;$Dyms_PAYMENTAMOUNT;##Dyms_PartyVCHAMOUNTVar;1000 ;* -1
+	415	:				Set Value	:	IsDeemedPositive		:	Yes
+	420	:				Set Value	:	IsLastDeemedPositive	:	Yes
+	425	:				Set Value	:	IsPartyLedger			:	No
+	670 : 				Set Target:	..
+	
+	200	:			Insert Collection Object	:	AllLedger Entries
+	210	:				Set Value	:	LedgerName				:	##Dyms_PartyNameVar;"Aanegundi Matta";"ABC"
+	215	:				Set Value	:	IsDeemedPositive		:	No
+	220	:				Set Value	:	IsLastDeemedPositive	:	No
+	225	:				Set Value	:	IsPartyLedger			:	Yes
+	230	:				Set Value	:	Amount					:	$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000;$Dyms_PAYMENTAMOUNT;700;(##Dyms_PartyVCHAMOUNTVar +
+	
+	312	:				Insert Collection Object	:	BillAllocations
+	313	:					Set Value	:	Name		:	##Dyms_AgnstSalesNo;"123"
+	314	:					Set Value	:	BillType	:	$$SysName:AgstRef;Advance;NewRef;OnAccount;Agst Ref
+	316	:					Set Value	:	Amount		:	$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000;$Dyms_PAYMENTAMOUNT;
+	325	: 					Set Target	:	...
+	710	: Create Target
+
+;;;;;;;;;;;;;;;; Log File ;;;;;;;;;;;;;;;;;;;;;;;;;;
+	5002	:  If: not $$LastResult;: Set: result : False
+	5004	:   Set File Log On
+	5005	:   OPEN FILE :@@DHIJrnllogfilepatch:Text:Write 
+	5010	:	Write File Line	: $$String:($$LastError)
+	5020	:	Write File Line	: $$String:"Error from :"+$$String:##Dyms_VoucherNumberVar
+	5030	:	Set File Log Off
+	5040	:	Close Target File
+	;	2570:		Write File Line	: $$String:($$LastError)
+	;	2580:	Write File Line	: $$String:"Error from :"+$VoucherNoDet
+	5042	:	Increment: ErrCount
+	5044	:  End If
+	
+	LocalFormula:	DateTimeFolder	:	$$LocaleString:($$YearOfDate:$$MachineDate)+$$LocaleString:"-"+$$LocaleString:($$ZeroFill:($$MonthOfDate:$$MachineDate):2)+$$LocaleString:"-"+$$LocaleString:($$ZeroFill:($$DayOfDate:$$MachineDate):2)+$$LocaleString:"-"+$$LocaleString:($$StringFindAndReplace:($$MachineTime):":":"-")
+
+	5450	:	End Walk
+	5455	:	End Progress
+	
+	5458	:	Set	:	DymsLocalHostPathUploadDown	:	@@DHIJrnlfileArchpatch;@@RetailerDownloadFTPSalesArch+"/"+@@DateTimeFolderFTP+"/"
+	5470	: End Batch Post
+	5480	: Else
+	5485	: 	Set	:	DymsLocalHostPathUploadDown	:	@@DHIJrnlfileArchpatch;@@RetailerDownloadFTPSalesArch+"/"+@@DateTimeFolderFTP+"/"	
+	12700	: End If
+	
+	12750	: End Walk
+	
+;;;;;;;;;;;;;;;;; Error Message ;;;;;;;;;;;;;;;;;;
+	12752	:	If	: ##Errcount = 0
+;;;;;;;;;;;;;;;; Copy File should not contain Commented text in the same line ;;;;;;;;;; which gives TCP error 
+	5490	:	Copy File	:	##DymsLocalHostPathUploadDown+"\"+ @DateTimeFolder+"\":##Dyms_LocalFileNames
+	5500	:	Delete File:##Dyms_LocalFileNames ;@@DHIJrnlfilepatch+"/"+$Name
+	12753	:	Set	:	Dyms_CountrMsgVAr2	:	$$LocaleString:"Status : Process completed! Journal Vouchers Imported Successfully!! ";+$$LocaleString:@@DHIJrnllogfilepatch
+	12754	:		Log	:  ##Dyms_CountrMsgVAr2
+	12756	:	Else
+	12757	:	Set	:	Dyms_CountrMsgVAr3	:	$$LocaleString:"Status : Error while Importing! Please Refer Log File " +$$LocaleString:@@DHIJrnllogfilepatch
+	12758	:		Log: ##Dyms_CountrMsgVAr3
+	12760	:	End If
+	
+	12780	: Else
+	12790	: Log: "No Data file in Journal Folder"
+	12800	:	End If
+	12810	: Else
+	12820	: Msg Box	:	"Warning!"	:	"Check Internet Availability!"
+	12830	:	End If
+

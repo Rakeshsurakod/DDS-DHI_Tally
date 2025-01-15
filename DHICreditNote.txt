@@ -1,0 +1,350 @@
+;;;; Jai Shree Ram ;;;;;
+
+[Collection: Dyms_DirectoryVoucherCollCredit]
+	
+	Data Source : Directory	: @@DHICreditfilepatch     
+	Filter		: Dyms_FilterFiles
+	Format		: $Name, 25
+	Title       : "File Listing"
+	Sub Title	: "File Name", "File Size", "Read Only"
+	
+;Select $name from Dyms_DirectoryVoucherCollCredit
+
+[Collection	:DymsJsonCreditCollection]
+	
+		Data Source:File JSON		: ##Dyms_LocalFileNames ;@@DHICreditfilepatch+"\"+$Name;
+   	  	JSON Object Path			: "CREDIT:1"
+		
+;Select $CREDITNOTENUMBER from DymsJsonCreditCollection
+
+[Collection:DymsJsonCreditInvCollections]
+	
+	Source Collection:DymsJsonCreditCollection
+	Walk				:   INVENTORY
+	compute				:	Dyms_VoucherNumberInv		:	$.CREDITNOTENUMBER
+	compute				:	Dyms_CREDITLEDGERNAME		:	$.CREDITLEDGERACCOUNT
+	Compute				:	Dyms_PRODUCTCODE			:	$SERVICENAME
+	Compute				:	Dyms_QUANTITY				:	$QUANTITY
+	Compute				:	Dyms_VoucherRATE			:	$RATE
+	Compute				:	Dyms_VoucherdiscPERC		:	$DISCPERC
+	Compute				:	Dyms_VoucherVchAmount		:	$TAXABLEAMOUNT
+	Filter:CreditInvVchnoFilter
+	
+[Collection:DymsJsonCreditLedCollections]
+	
+	Source Collection:DymsJsonCreditCollection	
+	Walk				:  TAXDETAILS
+	compute				:	Dyms_VoucherNumberLed		:	$.CREDITNOTENUMBER
+	compute				:	Dyms_VoucherDateLed			:	$.CREDITNOTEDATE
+	Compute				:	Dyms_IGST					:	$IGSTAMOUNT
+	Compute				:	Dyms_CGST					:	$CGSTAMOUNT
+	Compute				:	Dyms_SGST					:	$SGSTAMOUNT
+;	Compute				:	Dyms_TransportCharges		:	$TRANSPORTCHARGES
+;	Compute				: 	Dyms_LABOURCharges			: 	$LabourCharges
+;	Compute				:	Dyms_ROUNDOFF				:	$ROUNDOFF
+	Filter : CreditLedVchnoFilter
+
+[System:Formulae]
+	
+	DHICreditFolder         		: $CreditFolder:Company:##SVCurrentCompany
+	DHICreditFolderArc       		: $CreditArchiveFolder:Company:##SVCurrentCompany
+	DHICreditfilepatch				: @@DHIDatapath + "\" + @@DHICreditFolder
+	DHICreditfileArchpatch			: @@DHIDatapath + "\" + @@DHICreditFolderArc
+	DHICreditlogfilepatch			: @@DHICreditfilepatch + "\CreditLog.txt"
+	CreditInvVchnoFilter			: $Dyms_VoucherNumberInv=##Dyms_VoucherNumberVar
+	CreditLedVchnoFilter			: $Dyms_VoucherNumberLed=##Dyms_VoucherNumberVar
+
+[Function:Dyms_CreditNoteDownload]
+	
+	Variable	: 	DymsLocalPathSalesDownload		: String
+	
+	Variable	:	DymsCreditLogCount				:Number
+	Variable	:	Dyms_VoucherNumberVar			:STring
+	Variable	:	Dyms_VoucherDateVar				:STring
+	Variable	:	Dyms_AgnstSalesNo				:String
+	
+	;Variable	:	Dyms_PartyIDVar					:String
+	Variable	:	Dyms_PartyNameEVar				:STring	
+	Variable	:	Dyms_PartyNameVar				:STring	
+	Variable	:	Dyms_PartyMobNoVar				:STring	
+	Variable	:	Dyms_PartyStateVar				:STring	
+	Variable	:	Dyms_PartyAddressVar			:STring	
+	Variable	:	Dyms_PartyCityVar				:STring	
+	Variable	:	Dyms_PartyEmailVar				:STring	
+	Variable	:	Dyms_PartyCountryVar			:STring	
+	Variable	:	Dyms_PartyVCHAMOUNTVar			:STring	
+	Variable	:	Dyms_PartyGSTINVar				:STring	
+	Variable	:	Dyms_PartyPINCODEVar			:STring	
+	Variable	:	Dyms_REMARKNOTEVar				:String
+	Variable	:	Dyms_IRNVar						:STring	
+    Variable	:   Dyms_IRNAckDateVar	            :STring	
+    Variable	:   Dyms_IRNAckNoVar	            :STring	
+    Variable	:   Dyms_IRNQRCodeVar	            :STring
+
+	Variable	:	Dyms_SVProductCodeVar				:String
+	Variable	:	Dyms_AccountLEDGERNAME				:String
+	Variable	:	Dyms_SVQuantityVar					:String
+	Variable	:	Dyms_SVRateVar						:Number
+	Variable	:	Dyms_SVoucherGrossAmtVar			:String
+	Variable	:	Dyms_SVoucherInvAmtVar				:String
+	Variable	:	Dyms_DiscountPercsVar				:String
+	Variable	:	Dyms_LocalFileNames					:String
+
+	Variable	: 	Errcount							:Number: 0 
+	Variable	:	Dyms_SVoucherCGSTAmtVar				:String
+	Variable	:	Dyms_SVoucherSGSTAmtVar				:String
+	Variable	:	Dyms_SVoucherIGSTAmtVar				:String
+	Variable	:	Dyms_SVoucherLabourCharges			:String
+	Variable	:	Dyms_SVoucherTransportCharges		:String
+	Variable	:	Dyms_SVoucherRoundoffAmtVar			:String
+	Variable	:	Dyms_CountrMsgVAr1,Dyms_CountrMsgVAr2:String
+ 	Variable	: 	DymsLocalHostPathRetailer,DymsFTPPathRetailer			: String				
+	Variable	:   DymsLocalHostPathUploadDown			: String				
+	Variable	:	DymsCreditNoteAmount				: String
+	Variable	:   Dyms_CountrMsgVAr3					: String
+	
+	00		: 	Log: "Credit Note Is Running"	
+ 	020 	:	Set			: DymsLocalHostPathRetailer		:	@@DHICreditfilepatch;
+ 	030 	:	Set			: DymsFTPPathRetailer			:$$IsEmptyCollection:Dyms_DirectoryVoucherCollCredit;$$MakeFTPName:@@DymcsFTPName:@@DymcsDataAdmin:@@DymcsDataPassword:@@DymcsFTPCustomerFolder
+;	032		:	Msg Box	:	DymsFTPPathRetailer	:	##DymsFTPPathRetailer
+	034		:	If:$$IsInternetActive
+;	023  	:   Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncJob.AutoSyncJob : "Sales"
+;	03  	:   Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncAllJob.AutoSyncAllJob : ""
+	035		:	If:NOT $$IsEmptyCollection:Dyms_DirectoryVoucherCollCredit 
+
+	065		:	Walk Collection	:	Dyms_DirectoryVoucherCollCredit
+	068		:	Set	:	Dyms_LocalFileNames	:	""
+	070		:	Set	:	Dyms_LocalFileNames	:	@@DHICreditfilepatch+"\"+$Name
+;	072:	Msg Box	:	Dyms_LocalFileNames	:	##Dyms_LocalFileNames
+	100 	:   Set :	DymsCreditLogCount:$$NumItems:DymsJsonCreditCollection
+
+	105		:   If:##DymsCreditLogCount>0
+	120		:  	Start Batch Post:100
+;;;;;;;;;;;;;;;; CreditNote Log File ;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+	121		: 	Set File Log On
+	122		: 	OPEN FILE :@@DHICreditlogfilepatch:Text:Write 
+	123		:	Write File Line	: "==========================================================================="
+	124		: 	Write File Line	: "Total Credit Note Vouchers to Import - "+$$String:(##DymsCreditLogCount)+" On "+$$String:($$MachineDate)+"-"+$$String:($$MachineTime)
+	125		:	Close Target File
+	126		:	Set File Log Off
+	
+	127		:	Set	:	Dyms_CountrMsgVAr1	:	$$NumItems:DymsJsonCreditCollection 
+	128		:	Start Progress:(##Dyms_CountrMsgVAr1) : ($$LocaleString:"Importing Credit Notes") : "Please wait" : ""
+	129		:	Set	: Dyms_VoucherNumberVar	:	""
+	130		:	Walk Collection:DymsJsonCreditCollection
+	135		:	Set: Dyms_VoucherNumberVar		:$$String:$CREDITNOTENUMBER ;Dyms_VoucherVoucherNumber
+	136		:	Set: Dyms_VoucherDateVar		:$CREDITNOTEDATE;Dyms_VoucherDate
+	136a	:	Set: Dyms_AgnstSalesNo			:$AGSTREFSALENUMBER
+	137		:	Set: Dyms_PartyNameVar			:$CUSTOMERLEDGERNAME;Dyms_PartyName	
+	138		:	Set: Dyms_PartyMobNoVar			:$CUSTOMERMOBILENO;Dyms_PartyMobNo
+	139		:	Set: Dyms_PartyStateVar			:$CUSTOMERSTATE;Dyms_PartyState
+	140		:	Set: Dyms_PartyAddressVar		:$CUSTOMERADDRESS;Dyms_PartyAddress
+	141		:	Set: Dyms_PartyCityVar			:$CUSTOMERCITY;Dyms_PartyCity
+	142		:	Set: Dyms_PartyEmailVar			:$CUSTOMEREMAILADDRESS;Dyms_PartyEmail
+	143		:	Set: Dyms_PartyCountryVar		:$CUSTOMERCOUNTRY;Dyms_PartyCountry
+	144		:	Set: Dyms_PartyVCHAMOUNTVar		:$CREDITNOTEAMOUNT;Dyms_PartyVCHAMOUNT
+	144A	:	Set: Dyms_PartyGSTINVar			:$CUSTOMERGSTIN
+	144b	:	Set: Dyms_PartyPINCODEVar		:$CUSTOMERPINCODE
+	148		:	Set: Dyms_AccountLEDGERNAME		:$CREDITLEDGERACCOUNT
+;	149		:	Set: Dyms_TRANSACTIONTYPEVar	:$TRANSACTIONTYPE
+	145a	:	Set: Dyms_PartyNameEVar			:($Name:Ledger:##Dyms_PartyNameVar)
+	146d	:	Set: Dyms_REMARKNOTEVar			:$NARRATION
+	142p	:	Set: Dyms_IRNVar				:$IRN;"06ed1d060ca35202749c6b4985772f7b5f29573663f05b596e7984221fef2b9f"
+    143q	:	Set: Dyms_IRNAckDateVar			:$IRNACKDATE;"20220908"
+    144r	:	Set: Dyms_IRNAckNoVar			:$IRNACKNO;"252210021334919"
+    145s	:	Set: Dyms_IRNQRCodeVar			:$IRNQRCODE
+	
+;;;;;;;;;;;;; Credit Note Creation ;;;;;;;;;;;;;;;;
+
+	150	:	New Object	:	Voucher
+	155	:		Set			:	SVViewName		:	$$SysName:InvVchView
+	188 :  		Set Value	: 	PERSISTEDVIEW	:  ##SVViewName
+	170	:		Set Value	:	Date			:	$$Date:##Dyms_VoucherDateVar ;"01.05.2021"
+	165	:		Set Value	: 	VoucherNumber	: 	##Dyms_VoucherNumberVar;+"R";"123"
+	180	:		Set	Value	:	VoucherTypeName	:	$$String:"Credit Note";$Dyms_CreditVOUCHERTYPE
+	185	:		Set Value	:	IsInvoice		:	Yes
+	
+
+	805		:  Set Value		: BasicBuyerName			:	##Dyms_PartyNameVar;$Dyms_Consigneemailingname
+	806		:  Set Value		: BasicBuyerAddress			:	##Dyms_PartyAddressVar;$Dyms_ConsigneeAddress
+	810		:  Set Value		: Consigneemailingname		:  	##Dyms_PartyNameVar;$Dyms_Consigneemailingname;"Shiv Ganga Marbles"
+	815		:  Set Value		: Consigneegstin			:  	##Dyms_PartyGSTINVar;$Dyms_Consigneegstin;	"07BAGPG3952C1Z1"
+	816		:  Set Value		: ConsigneePincode			:  	##Dyms_PartyPINCODEVar;$Dyms_ConsigneePincode;"110085"
+	820		:  Set Value		: ConsigneeStateName		:	##Dyms_PartyStateVar;$Dyms_ShippedToState; beceause both consignee and shipedto states are same
+	;825		: End Walk
+
+;;;;;;; Party Details;;;;;;;;;;;;
+	830		:  Set Value		: PartyLedgername			:  ##Dyms_PartyNameVar;"Shiv Ganga Marbles"
+	831		:  Set Value		: Partyname					:  ##Dyms_PartyNameVar;"Shiv Ganga Marbles"
+	835		:  Set Value		: PartyGSTIN				:  ##Dyms_PartyGSTINVar;"07BAGPG3952C1Z1"
+	836		:  Set Value		: PartyPincode				:  ##Dyms_PartyPINCODEVar;"110085"
+	837		:  Set Value		: Address					:  ##Dyms_PartyAddressVar;"Shiv Ganga Marbles"
+	215a  	:  Set Value   		: StateName    				:  ##Dyms_PartyStateVar
+	
+;;;;;;;; e-invoice details ;;;;;;;;;;;;
+	209		:  Set Value		: VCHCreditQRCodeSt			:  $$String:##Dyms_IRNQRCodeVar
+	205p 	:  Set Value		: IRN						:  $$String:##Dyms_IRNVar		
+	206q 	:  Set Value		: IRNAckDate				:  $$Date:##Dyms_IRNAckDateVar	
+	207r 	:  Set Value		: IRNAckNo					:  $$String:##Dyms_IRNAckNoVar	
+	1150 	:  Set Value		: ResetIRNQrCode			:  Yes
+	210s 	:  Set Value		: Narration					:  $$String:##Dyms_REMARKNOTEVar
+
+	200		:	Insert Collection Object	:	LedgerEntries
+	210		:		Set Value	:	LedgerName				:	$$String:##Dyms_PartyNameVar;"Aanegundi Matta";"ABC"
+	215		:		Set Value	:	IsDeemedPositive		:	No
+	220		:		Set Value	:	IsLastDeemedPositive	:	No
+	225		:		Set Value	:	IsPartyLedger			:	Yes
+	230		:		Set Value	:	Amount					:	$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000;$Dyms_PAYMENTAMOUNT;700;(##Dyms_PartyVCHAMOUNTVar +
+	
+	312		:		Insert Collection Object	:	BillAllocations
+	313		:			Set Value	:	Name		:	##Dyms_AgnstSalesNo;"123"
+	314		:			Set Value	:	BillType	:	$$SysName:AgstRef;Advance;NewRef;OnAccount;Agst Ref
+	316		:			Set Value	:	Amount		:	$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000;$Dyms_PAYMENTAMOUNT;
+	325		:				Set Target	:	..
+	
+;;;;;;;;;;;;;;;;;;; Inventory Allocation ;;;;;;;;;;;;;;;;;;;;;;;;;;
+	2000 	: Walk Collection:DymsJsonCreditInvCollections
+	2010	:	Set:Dyms_SVProductCodeVar				:	$Dyms_PRODUCTCODE			
+	2022	:	Set:Dyms_AccountLEDGERNAME				:	$Dyms_CREDITLEDGERNAME;"Sales Import";	$GulfBattery_BatchName			
+	2032	:	Set:Dyms_SVQuantityVar					:	$Dyms_QUANTITY		
+	2042	:	Set:Dyms_SVRateVar						:	$Dyms_VoucherRATE	
+	2052	:	Set:Dyms_SVoucherGrossAmtVar			:	$Dyms_VoucherVchAmount		
+	2062	:	Set:Dyms_SVoucherInvAmtVar				:	$Dyms_VoucherVchAmount			
+	2072	:	Set:Dyms_DiscountPercsVar				:	$Dyms_VoucherdiscPERC			
+	
+	2500 	: 	Insert Collection Object: ALLINVENTORYENTRIES
+	2510 	: 	Set Value		:	STOCKITEMNAME						:	$$String:##Dyms_SVProductCodeVar
+	2513 	: 	Set Value		:	ISDEEMEDPOSITIVE					:	 Yes
+	2520	:	Set Value   	:	ACTUALQTY							:	$$TgtObject:($$AsQty:##Dyms_SVQuantityVar);*-1
+	2530	:	Set Value		:	BILLEDQTY							:	$$TgtObject:($$AsQty:##Dyms_SVQuantityVar);*-1	 
+	2535	:	Set Value		:	RATE						 		:	($$TgtObject:($$AsRate:##Dyms_SVRateVar))
+	2536	:   Set Value		: 	Discount							:	($$TgtObject:($$Number:##Dyms_DiscountPercsVar))
+	2538 	: 	Set Value		:	AMOUNT								:	$$Negative:($$AsAmount:##Dyms_SVoucherInvAmtVar)
+	
+	2600	: 	INSERT COLLECTION OBJECT: BATCHALLOCATIONS
+	2601 	:  	SET VALUE		: 	GODOWNNAME							:   $$LocaleString:"Main Location";@@DymcsFTPCustomerInvenFolder11;
+	;2603	:	Set Value		:	BatchName							:	$$String:##GulfBattery_SVBatchNameVar
+	2610	:   SET VALUE		: 	ACTUALQTY							:  ($$TgtObject:$$AsQty:##Dyms_SVQuantityVar);*-1	 
+	2611	:  	SET VALUE		: 	BILLEDQTY							:  ($$TgtObject:$$AsQty:##Dyms_SVQuantityVar);*-1
+	2616	:  	SET VALUE		: 	RATE								:   ($$TgtObject:($$AsRate:##Dyms_SVRateVar))		 
+	2617	:   Set Value		: 	BatchDiscount						:	$$TgtObject:$$Number:##Dyms_DiscountPercsVar
+	2620 	:  	SET VALUE		: 	AMOUNT								:   $$Negative:($$AsAmount:##Dyms_SVoucherInvAmtVar)
+	;2630	:  	SET VALUE		:   ORDERDUEDATE						:   $$DateRange:($$TgtObject:$$Date:##GulfBattery_SalesVoucherDateVar):($$TgtObject:$$Date:##GulfBattery_SalesVoucherDateVar):True
+	2660	: 	Set Target		:	..			
+			
+;;;;;;;;;;;;;;;; Credit Note accounts	;;;;;;;;;;;;;;;;;;;;;;;;
+	2700	: 	INSERT COLLECTION OBJECT: ACCOUNTINGALLOCATIONS				
+	2710	: 	SET VALUE		: LedgerName							: 	$$String:##Dyms_AccountLEDGERNAME;"SALES GST";##GulfBattery_SVCommonSalesAccount
+	2720	: 	SET VALUE		: IsDeemedPositive						: 	Yes
+	2730	: 	SET VALUE		: ISPARTYLEDGER							: 	No
+	2740	: 	Set Value		: Amount								: 	$$Negative:($$AsAmount:##Dyms_SVoucherInvAmtVar);*-1
+	2750	: 	Set Target		: ..
+
+	3000	: End Walk
+
+	3100    : Walk Collection:DymsJsonCreditLedCollections	
+	3101	: 	Set :	Dyms_SVoucherIGSTAmtVar:$Dyms_IGST;"
+	3102	: 	Set :	Dyms_SVoucherSGSTAmtVar:$Dyms_SGST;"
+	3103	: 	Set :	Dyms_SVoucherCGSTAmtVar:$Dyms_CGST;"
+;	3104	: 	Set :	Dyms_SVoucherRoundoffAmtVar:$Dyms_ROUNDOFF;"
+
+	3106	: If 	: Not ##Dyms_SVoucherIGSTAmtVar="0.00"
+	3108	: 	INSERT COLLECTION OBJECT			: LEDGERENTRIES
+	3110	: 	SET VALUE		: LedgerName		: $$String:@@DHIIGSTLedger;"IGST"
+	3112	: 	SET VALUE		: IsDeemedPositive	: Yes
+	3114	: 	SET VALUE		: ISPARTYLEDGER		: No
+	3116	: 	SET VALUE		: REMOVEZEROENTRIES	: No
+	3210	:	Set Value		: ISLASTDEEMEDPOSITIVE: Yes
+	3117	: 	Set Value		: Amount			: $$TgtObject:($$Negative:($$AsAmount:##Dyms_SVoucherIGSTAmtVar))
+	3118	: 	Set Target		: ..
+	3119	: End If
+	
+	3120	: If 	: Not ##Dyms_SVoucherCGSTAmtVar="0.00"
+	3122	: 	INSERT COLLECTION OBJECT			: LEDGERENTRIES
+	3124	: 	SET VALUE		: LedgerName		: $$String:@@DHICGSTLedger;"CGST"
+	3125	: 	SET VALUE		: IsDeemedPositive	: yes
+	3126	: 	SET VALUE		: ISPARTYLEDGER		: No
+	3127	: 	SET VALUE		: REMOVEZEROENTRIES	: No
+	3211	:	Set Value		: ISLASTDEEMEDPOSITIVE: Yes
+	3128	: 	Set Value		: Amount			: $$TgtObject:($$Negative:($$AsAmount:##Dyms_SVoucherCGSTAmtVar))
+	3129	: 	Set Target		: ..
+	3130	: End If
+	
+	3132	: If 	: Not ##Dyms_SVoucherSGSTAmtVar="0.00"
+	3133	: 	INSERT COLLECTION OBJECT			: LEDGERENTRIES
+	3134	: 	SET VALUE		: LedgerName		: $$String:@@DHISGSTLedger;"SGST"
+	3135	: 	SET VALUE		: IsDeemedPositive	: yes
+	3136	: 	SET VALUE		: ISPARTYLEDGER		: No
+	3137	: 	SET VALUE		: REMOVEZEROENTRIES	: No
+	3212	:	Set Value		: ISLASTDEEMEDPOSITIVE: Yes
+	3138	: 	Set Value		: Amount			: $$TgtObject:($$Negative:($$AsAmount:##Dyms_SVoucherSGSTAmtVar))
+	3139	: 	Set Target		: ..
+	3140	: End If	
+	2760	: 	Set Target		: ...
+	661		: End Walk
+	670 	: Set Target:	..
+	710		: Create Target
+	;711	: End If
+
+;;;;;;;;;;;;;;;; Log File ;;;;;;;;;;;;;;;;;;;;;;;;;;
+	5002	:  If: not $$LastResult;: Set: result : False
+	5004	:   Set File Log On
+	5005	:   OPEN FILE :@@DHICreditlogfilepatch:Text:Write 
+	5010	:	Write File Line	: $$String:($$LastError)
+	5020	:	Write File Line	: $$String:"Error from :"+$$String:##Dyms_VoucherNumberVar
+	5030	:	Set File Log Off
+	5040	:	Close Target File
+	5042	:	Increment: ErrCount
+	5044	:  End If
+	5450	:	End Walk
+	
+	LocalFormula:	DateTimeFolder	:	$$LocaleString:($$YearOfDate:$$MachineDate)+$$LocaleString:"-"+$$LocaleString:($$ZeroFill:($$MonthOfDate:$$MachineDate):2)+$$LocaleString:"-"+$$LocaleString:($$ZeroFill:($$DayOfDate:$$MachineDate):2)+$$LocaleString:"-"+$$LocaleString:($$StringFindAndReplace:($$MachineTime):":":"-")
+	5458	:	Set	:	DymsLocalHostPathUploadDown	:	@@DHICreditfileArchpatch
+;;;;;;;;;;;;;;;;; Error Message ;;;;;;;;;;;;;;;;;;
+	12752	:	If	: ##Errcount = 0
+	5490	:	Copy File	:	##DymsLocalHostPathUploadDown+"\"+ @DateTimeFolder+"\":##Dyms_LocalFileNames
+	5500	:	Delete File:##Dyms_LocalFileNames
+	12753	:	Set	:	Dyms_CountrMsgVAr2	:	$$LocaleString:"Status : Process completed! Credit Notes Imported Successfully!! ";+$$LocaleString:@@DHICreditlogfilepatch
+	12754	:		Log	:  ##Dyms_CountrMsgVAr2
+	12756	:	Else
+	12757	:	Set	:	Dyms_CountrMsgVAr3	:	$$LocaleString:"Status : Error while Importing! Please Refer Log File " +$$LocaleString:@@DHICreditlogfilepatch
+	12758	:		Log: ##Dyms_CountrMsgVAr3
+	5042a	:	Decrement: ErrCount
+	12760	:	End If
+	
+	5455	: End Progress
+	5470	: End Batch Post
+	5480	: Else
+	5485	:	Set	:	DymsLocalHostPathUploadDown	:	@@DHICreditfileArchpatch
+	12700	: End If
+	12750	: End Walk
+	
+	12780	: Else
+	12790	: Log: "No Data File In Credit Note Folder"
+	12800	:	End If
+	12810	: Else
+	12820	: Msg Box	:	"Warning!"	:	"Check Internet Availability!"
+	12830	:	End If
+
+	
+
+[#Part: DBLLINE Narration]
+	
+	Option	: DBlLine Narration QRValue :  @@isCreditNote
+
+[!Part:DBlLine Narration QRValue] 
+
+	Add : Line: Before : VCH NarrPrompt:VCH CreditQRValue
+	
+[Line: VCH CreditQRValue]
+		
+	Field	: Medium Prompt, VCH CreditQRCode 
+	Local	: Field	: Medium Prompt : Set as : "QR CodeValue : "
+	Local	: Field	: Medium Prompt : Width	:	15
+	Local	: Field	: VCH CreditQRCode : Width	:	140
+	Invisible	:	Yes
+	
+[Field:VCH CreditQRCode]
+	Use			: Narration Field
+	Storage 	: VCHCreditQRCodeSt
+	Set Always	: Yes

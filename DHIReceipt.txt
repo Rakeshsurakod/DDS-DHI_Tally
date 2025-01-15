@@ -1,0 +1,187 @@
+;;;; Jai Shree Ram ;;;;;
+
+[Collection: Dyms_DirectoryVoucherCollRcpt]
+	
+	Data Source : Directory	: @@DHIRcptfilepatch     
+	Filter		: Dyms_FilterFiles
+	Format		: $Name, 25
+	Title       : "File Listing"
+	Sub Title	: "File Name", "File Size", "Read Only"
+	
+;Select $name from Dyms_DirectoryVoucherCollRcpt
+
+[Collection	:DymsJsonRcptCollection]
+	
+		Data Source	: File JSON		: ##Dyms_LocalFileNames
+   	  	JSON Object Path			: "RECEIPT:1"
+		Compute		: RECEIPTNUMBER	: $$String:$RECEIPTNUMBER
+		
+;Select $RECEIPTNUMBER from DymsJsonRcptCollection
+
+[System:Formulae]
+	
+	DHIRcptFolder         		: $DHIReceiptFolder:Company:##SVCurrentCompany
+	DHIRcptFolderArc       		: $DHIReceiptArchiveFolder:Company:##SVCurrentCompany
+	DHIRcptfilepatch			: @@DHIDatapath + "\" + @@DHIRcptFolder
+	DHIRcptfileArchpatch		: @@DHIDatapath + "\" + @@DHIRcptFolderArc
+	DHIRcptlogfilepatch			: @@DHIRcptfilepatch + "\RcptLog.txt"
+	
+[Function:Dyms_ReceiptDownload]
+	
+	Variable	: 	DymsLocalPathSalesDownload		: String
+	
+	Variable	:	DymsRcptLogCount				:Number
+	Variable	:	Dyms_VoucherNumberVar			:STring
+	Variable	:	Dyms_VoucherDateVar				:STring
+	Variable	:	Dyms_AgnstSalesNo				:String
+	
+	;Variable	:	Dyms_PartyIDVar					:String
+	Variable	:	Dyms_PartyNameEVar				:STring	
+	Variable	:	Dyms_PartyNameVar				:STring	
+	Variable	:	Dyms_PartyVCHAMOUNTVar			:STring	
+	Variable	:	Dyms_REMARKNOTEVar				:String
+	
+	Variable	:	Dyms_TRANSACTIONTYPEVar				:String
+	Variable	:	Dyms_AccountLEDGERNAME				:String
+	Variable	:	Dyms_LocalFileNames					:String
+
+	Variable	: 	Errcount							:Number: 0 
+	Variable	:	Dyms_CountrMsgVAr1,Dyms_CountrMsgVAr2:String
+ 	Variable	: 	DymsLocalHostPathRetailer,DymsFTPPathRetailer	: String				
+	Variable	:   DymsLocalHostPathUploadDown			: String				
+	Variable	:   Dyms_CountrMsgVAr3					: String
+	
+	00		: 	Log: "Receipt Is Running"	
+ 	020 	:	Set			: DymsLocalHostPathRetailer		:	@@DHIRcptfilepatch;
+ 	030 	:	Set			: DymsFTPPathRetailer			:$$IsEmptyCollection:Dyms_DirectoryVoucherCollRcpt;$$MakeFTPName:@@DymcsFTPName:@@DymcsDataAdmin:@@DymcsDataPassword:@@DymcsFTPCustomerFolder
+;	032		:	Msg Box	:	DymsFTPPathRetailer	:	##DymsFTPPathRetailer
+	034		:	If:$$IsInternetActive
+;	023  	:   Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncJob.AutoSyncJob : "Sales"
+;	03  	:   Modify Object : (Company,$$CurrentSimpleCompany).AutoSyncAllJob.AutoSyncAllJob : ""
+	035		:	If:NOT $$IsEmptyCollection:Dyms_DirectoryVoucherCollRcpt 
+
+	065		:	Walk Collection	:	Dyms_DirectoryVoucherCollRcpt
+	068		:	Set	:	Dyms_LocalFileNames	:	""
+	070		:	Set	:	Dyms_LocalFileNames	:	@@DHIRcptfilepatch+"\"+$Name
+;	072:	Msg Box	:	Dyms_LocalFileNames	:	##Dyms_LocalFileNames
+	100 	:   Set :	DymsRcptLogCount:$$NumItems:DymsJsonRcptCollection
+	105		:   If:##DymsRcptLogCount>0
+	120		:  	Start Batch Post:100
+	
+;;;;;;;;;;;;;;;; Receipt Log File ;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+	121		: 	Set File Log On
+	122		: 	OPEN FILE :@@DHIRcptlogfilepatch:Text:Write 
+	123		:	Write File Line	: "==========================================================================="
+	124		: 	Write File Line	: "Total Receipt Vouchers to Import - "+$$String:(##DymsRcptLogCount)+" On "+$$String:($$MachineDate)+"-"+$$String:($$MachineTime)
+	125		:	Close Target File
+	126		:	Set File Log Off
+	
+	127		:	Set	:	Dyms_CountrMsgVAr1	:	$$NumItems:DymsJsonRcptCollection 
+	128		:	Start Progress:(##Dyms_CountrMsgVAr1) : ($$LocaleString:"Importing Receipts") : "Please wait" : ""
+	129		:	Set	: Dyms_VoucherNumberVar	:	""
+	130		:	Walk Collection:DymsJsonRcptCollection
+	135		:	Set: Dyms_VoucherNumberVar		:$$String:$RECEIPTNUMBER
+	136		:	Set: Dyms_VoucherDateVar		:$RECEIPTDATE 
+	136a	:	Set: Dyms_AgnstSalesNo			:$AGSTREFSALENUMBER
+	144		:	Set: Dyms_PartyVCHAMOUNTVar		:$RECEIPTAMOUNT
+	137		:	Set: Dyms_PartyNameVar			:$CUSTOMERLEDGERNAME
+	148		:	Set: Dyms_AccountLEDGERNAME		:$RECEIPTLEDGERACCOUNT
+	149		:	Set: Dyms_TRANSACTIONTYPEVar	:$TRANSACTIONTYPE
+	145a	:	Set: Dyms_PartyNameEVar			:($Name:Ledger:##Dyms_PartyNameVar)
+	146d	:	Set: Dyms_REMARKNOTEVar			:$NARRATION
+
+;;;;;;;;;;;;; Receipt Creation ;;;;;;;;;;;;;;;;
+	150	:	New Object	:	Voucher
+	155	:		Set			:	SVViewName		:	$$SysName:AcctgVchView
+	700	: 		Set Value	:	PersistedView	:	##SVViewName ;$$SysName:AcctgVchView;
+	170	:		Set Value	:	Date			:	$$Date:##Dyms_VoucherDateVar
+	165	:		Set Value	: 	VoucherNumber	: 	##Dyms_VoucherNumberVar	
+	180	:		Set	Value	:	VoucherTypeName	:	$$String:"Receipt"
+	185	:		Set Value	:	IsInvoice		:	No
+	190 :   	Set Value	: 	Narration		:   $$String:##Dyms_REMARKNOTEVar
+	
+	1050:	Show Progress:$$LoopIndex:$$Sprintf:" %s %s":($$LocaleString:"Receipt Voucher Importing for.."):(##Dyms_VoucherNumberVar)
+	
+	200	:			Insert Collection Object	:	AllLedger Entries
+	210	:				Set Value	:	LedgerName				:	##Dyms_PartyNameVar;"Aanegundi Matta";"ABC"
+	215	:				Set Value	:	IsDeemedPositive		:	No
+	220	:				Set Value	:	IsLastDeemedPositive	:	No
+	225	:				Set Value	:	IsPartyLedger			:	Yes
+	230	:				Set Value	:	Amount					:	$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000;$Dyms_PAYMENTAMOUNT;700;(##Dyms_PartyVCHAMOUNTVar +
+	
+	312	:				Insert Collection Object	:	BillAllocations
+	313	:					Set Value	:	Name		:	##Dyms_AgnstSalesNo;"123"
+	314	:					Set Value	:	BillType	:	$$SysName:AgstRef;Advance;NewRef;OnAccount;Agst Ref
+	316	:					Set Value	:	Amount		:	$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000;$Dyms_PAYMENTAMOUNT;
+	325	: 					Set Target	:	...
+
+	400	:			Insert Collection Object	:	AllLedger Entries
+	410	:				Set Value	:	LedgerName				:	##Dyms_AccountLEDGERNAME
+	430	:				Set Value	:	Amount					:	$$Negative:$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000;$Dyms_PAYMENTAMOUNT;##Dyms_PartyVCHAMOUNTVar;1000 ;* -1
+	415	:				Set Value	:	IsDeemedPositive		:	Yes
+	420	:				Set Value	:	IsLastDeemedPositive	:	Yes
+	425	:				Set Value	:	IsPartyLedger			:	Yes
+	
+	510 : 		INSERT COLLECTION OBJECT : BankAllocations
+	520 : 			SET TARGET : BANKALLOCATIONS
+	530 : 			SET VALUE : Date : $$Date:##Dyms_VoucherDateVar;"01.05.2021"
+	540 : 			SET VALUE : INSTRUMENTDATE : $$Date:##Dyms_VoucherDateVar;##Dyms_VoucherDateVar;"01.05.2021"
+	550 : 			SET VALUE : InstrumentNumber : $TRANSACTIONID;PAYMENTID;"9743877756"
+	551	: 			Set Value : Bank Name		 : ##Dyms_AccountLEDGERNAME;$Dyms_PaymentParty
+	560 : 			Set Value : Name : $$MakeUniqueID
+			
+	610 : 	SET VALUE : PAYMENTMODE : $$SysName:Transacted;"Transacted"
+	620 : 	SET VALUE : PaymentFavouring : ##Dyms_PartyNameVar;"Aanegundi Matta";$partyledgername
+	630 : 	SET VALUE : TransactionType : @@PymentTypeselect;$$Sysname:ChequeDD
+;	640 : 	SET VALUE : UniqueReferenceNumber : $VCHChequeno
+;	650 : 	SET VALUE : ChequeCrossComment : $$LocaleString:"A/c Payee"
+	660 : 	SET VALUE : Amount : $$Negative:$$AsAmount:##Dyms_PartyVCHAMOUNTVar;1000 ;* -1;
+	670 : Set Target:	..
+	
+	710	: Create Target
+
+;;;;;;;;;;;;;;;; Log File ;;;;;;;;;;;;;;;;;;;;;;;;;;
+	5002	:  If: not $$LastResult;: Set: result : False
+	5004	:   Set File Log On
+	5005	:   OPEN FILE :@@DHIRcptlogfilepatch:Text:Write 
+	5010	:	Write File Line	: $$String:($$LastError)
+	5020	:	Write File Line	: $$String:"Error from :"+$$String:##Dyms_VoucherNumberVar
+	5030	:	Set File Log Off
+	5040	:	Close Target File
+	5042	:	Increment: ErrCount
+	5044	:  End If
+	
+	LocalFormula:	DateTimeFolder	:	$$LocaleString:($$YearOfDate:$$MachineDate)+$$LocaleString:"-"+$$LocaleString:($$ZeroFill:($$MonthOfDate:$$MachineDate):2)+$$LocaleString:"-"+$$LocaleString:($$ZeroFill:($$DayOfDate:$$MachineDate):2)+$$LocaleString:"-"+$$LocaleString:($$StringFindAndReplace:($$MachineTime):":":"-")
+
+	5450	:	End Walk
+	5455	:	End Progress	
+	5458	:	Set	:	DymsLocalHostPathUploadDown	:	@@DHIRcptfileArchpatch
+	5470	: End Batch Post
+	5480	: Else
+	5485	:	Set	:	DymsLocalHostPathUploadDown	:	@@DHIRcptfileArchpatch
+	12700	: End If
+	12750	: End Walk
+	
+;;;;;;;;;;;;;;;;; Error Message ;;;;;;;;;;;;;;;;;;
+	12752	:	If	: ##Errcount = 0
+	5490	:	Copy File	:	($$String:(##DymsLocalHostPathUploadDown + "\" + @DateTimeFolder + "\") ): ##Dyms_LocalFileNames
+	5500	:	Delete File:##Dyms_LocalFileNames
+	12753	:	Set	:	Dyms_CountrMsgVAr2	:	$$LocaleString:"Status : Process completed! Receipt Imported Successfully!! ";+$$LocaleString:@@DHIRcptlogfilepatch
+	12754	:		Log	:  ##Dyms_CountrMsgVAr2
+	12756	:	Else
+	12757	:	Set	:	Dyms_CountrMsgVAr3	:	$$LocaleString:"Status : Error while Importing!! Please Refer Log File " +$$LocaleString:@@DHIRcptlogfilepatch
+	12758	:		Log: ##Dyms_CountrMsgVAr3
+	12760	:	End If
+	
+	12780	: Else
+	12790	: Log: "No Data file in Receipt Folder"
+	12800	:	End If
+	12810	: Else
+	12820	: Msg Box:"Warning!" :	"Check Internet Availability!"
+	12830	:	End If
+
+
+[System:Formulas]
+	PymentTypeselect : If $TRANSACTIONTYPE = "Cheque"  then $$SysName:ChequeDD else If $TRANSACTIONTYPE = "CARD" then $$SysName:CARD else $$SysName:eFundTransfer;$Dyms_PAYMENTTYPE =  then 
+	
+
